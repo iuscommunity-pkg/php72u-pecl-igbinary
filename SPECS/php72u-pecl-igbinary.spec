@@ -1,3 +1,5 @@
+# IUS spec file for php72u-pecl-igbinary, forked from:
+#
 # Fedora spec file for php-pecl-igbinary
 #
 # Copyright (c) 2010-2017 Remi Collet
@@ -9,38 +11,57 @@
 %global pecl_name  igbinary
 %global with_zts   0%{?__ztsphp:1}
 %global ini_name   40-%{pecl_name}.ini
-
-%global upstream_version 2.0.5
-#global upstream_prever  RC1
+%global php_base php72u
 
 Summary:        Replacement for the standard PHP serializer
-Name:           php-pecl-igbinary
-Version:        %{upstream_version}%{?upstream_prever:~%{upstream_prever}}
-Release:        1%{?dist}
-Source0:        http://pecl.php.net/get/%{pecl_name}-%{upstream_version}%{?upstream_prever}.tgz
+Name:           %{php_base}-pecl-%{pecl_name}
+Version:        2.0.5
+Release:        1.ius%{?dist}
+Source0:        http://pecl.php.net/get/%{pecl_name}-%{version}.tgz
 License:        BSD
 Group:          System Environment/Libraries
 
-URL:            http://pecl.php.net/package/igbinary
+URL:            http://pecl.php.net/package/%{pecl_name}
 
-BuildRequires:  php-pear
-BuildRequires:  php-devel >= 5.2.0
-BuildRequires:  php-pecl-apcu-devel
+BuildRequires:  pecl >= 1.10.0
+BuildRequires:  %{php_base}-devel
+BuildRequires:  %{php_base}-pecl-apcu-devel
 
 Requires:       php(zend-abi) = %{php_zend_api}
 Requires:       php(api) = %{php_core_api}
 
+Requires(post): pecl >= 1.10.0
+Requires(postun): pecl >= 1.10.0
+
+# provide the stock name
+Provides:       php-pecl-%{pecl_name} = %{version}
+Provides:       php-pecl-%{pecl_name}%{?_isa} = %{version}
+
+# provide the stock and IUS names without pecl
 Provides:       php-%{pecl_name} = %{version}
 Provides:       php-%{pecl_name}%{?_isa} = %{version}
+Provides:       %{php_base}-%{pecl_name} = %{version}
+Provides:       %{php_base}-%{pecl_name}%{?_isa} = %{version}
+
+# provide the stock and IUS names in pecl() format
 Provides:       php-pecl(%{pecl_name}) = %{version}
 Provides:       php-pecl(%{pecl_name})%{?_isa} = %{version}
+Provides:       %{php_base}-pecl(%{pecl_name}) = %{version}
+Provides:       %{php_base}-pecl(%{pecl_name})%{?_isa} = %{version}
+
+# conflict with the stock name
+Conflicts:      php-pecl-%{pecl_name} < %{version}
+
+%{?filter_provides_in: %filter_provides_in %{php_extdir}/.*\.so$}
+%{?filter_provides_in: %filter_provides_in %{php_ztsextdir}/.*\.so$}
+%{?filter_setup}
 
 
 %description
 Igbinary is a drop in replacement for the standard PHP serializer.
 
-Instead of time and space consuming textual representation, 
-igbinary stores PHP data structures in a compact binary form. 
+Instead of time and space consuming textual representation,
+igbinary stores PHP data structures in a compact binary form.
 Savings are significant when using memcached or similar memory
 based storages for serialized data.
 
@@ -48,8 +69,12 @@ based storages for serialized data.
 %package devel
 Summary:       Igbinary developer files (header)
 Group:         Development/Libraries
-Requires:      php-pecl-%{pecl_name}%{?_isa} = %{version}-%{release}
-Requires:      php-devel%{?_isa}
+Requires:       %{name}%{?_isa} = %{version}-%{release}
+Requires:       %{php_base}-devel%{?_isa}
+
+Provides:       php-pecl-%{pecl_name}-devel = %{version}
+Provides:       php-pecl-%{pecl_name}-devel%{?_isa} = %{version}
+Conflicts:      php-pecl-%{pecl_name}-devel < %{version}
 
 %description devel
 These are the files needed to compile programs using Igbinary
@@ -57,20 +82,20 @@ These are the files needed to compile programs using Igbinary
 
 %prep
 %setup -q -c
-mv %{pecl_name}-%{upstream_version}%{?upstream_prever} NTS
+mv %{pecl_name}-%{version} NTS
 
 sed -e '/COPYING/s/role="doc"/role="src"/' -i package.xml
 
-cd NTS
+pushd NTS
 
 # Check version
 subdir="php$(%{__php} -r 'echo PHP_MAJOR_VERSION;')"
 extver=$(sed -n '/#define PHP_IGBINARY_VERSION/{s/.* "//;s/".*$//;p}' src/$subdir/igbinary.h)
-if test "x${extver}" != "x%{upstream_version}%{?upstream_prever}"; then
-   : Error: Upstream version is ${extver}, expecting %{upstream_version}%{?upstream_prever}.
+if test "x${extver}" != "x%{version}"; then
+   : Error: Upstream version is ${extver}, expecting %{version}.
    exit 1
 fi
-cd ..
+popd
 
 %if %{with_zts}
 cp -r NTS ZTS
@@ -93,23 +118,25 @@ EOF
 
 
 %build
-cd NTS
+pushd NTS
 %{_bindir}/phpize
 %configure --with-php-config=%{_bindir}/php-config
 make %{?_smp_mflags}
+popd
 
 %if %{with_zts}
-cd ../ZTS
+pushd ZTS
 %{_bindir}/zts-phpize
 %configure --with-php-config=%{_bindir}/zts-php-config
 make %{?_smp_mflags}
+popd
 %endif
 
 
 %install
 make install -C NTS INSTALL_ROOT=%{buildroot}
 
-install -D -m 644 package.xml %{buildroot}%{pecl_xmldir}/%{name}.xml
+install -D -m 644 package.xml %{buildroot}%{pecl_xmldir}/%{pecl_name}.xml
 
 install -D -m 644 %{ini_name} %{buildroot}%{php_inidir}/%{ini_name}
 
@@ -120,7 +147,7 @@ install -D -m 644 %{ini_name} %{buildroot}%{php_ztsinidir}/%{ini_name}
 %endif
 
 # Test & Documentation
-cd NTS
+pushd NTS
 for i in $(grep 'role="test"' ../package.xml | sed -e 's/^.*name="//;s/".*$//')
 do [ -f $i       ] && install -Dpm 644 $i       %{buildroot}%{pecl_testdir}/%{pecl_name}/$i
    [ -f tests/$i ] && install -Dpm 644 tests/$i %{buildroot}%{pecl_testdir}/%{pecl_name}/tests/$i
@@ -128,6 +155,7 @@ done
 for i in $(grep 'role="doc"' ../package.xml | sed -e 's/^.*name="//;s/".*$//')
 do install -Dpm 644 $i %{buildroot}%{pecl_docdir}/%{pecl_name}/$i
 done
+popd
 
 
 %check
@@ -145,12 +173,13 @@ fi
     --modules | grep %{pecl_name}
 
 : upstream test suite
-cd NTS
+pushd NTS
 TEST_PHP_EXECUTABLE=%{_bindir}/php \
 TEST_PHP_ARGS="-n $MOD -d extension=$PWD/modules/%{pecl_name}.so" \
 NO_INTERACTION=1 \
 REPORT_EXIT_STATUS=1 \
 %{_bindir}/php -n run-tests.php --show-diff
+popd
 
 %if %{with_zts}
 : simple ZTS module load test, without APC, as optional
@@ -159,21 +188,32 @@ REPORT_EXIT_STATUS=1 \
     --modules | grep %{pecl_name}
 
 : upstream test suite
-cd ../ZTS
+pushd ZTS
 TEST_PHP_EXECUTABLE=%{__ztsphp} \
 TEST_PHP_ARGS="-n $MOD -d extension=$PWD/modules/%{pecl_name}.so" \
 NO_INTERACTION=1 \
 REPORT_EXIT_STATUS=1 \
 %{__ztsphp} -n run-tests.php --show-diff
+popd
 %endif
 
 
+%post
+%{pecl_install} %{pecl_xmldir}/%{pecl_name}.xml >/dev/null || :
+
+
+%postun
+if [ $1 -eq 0 ]; then
+    %{pecl_uninstall} %{pecl_name} >/dev/null || :
+fi
+
+
 %files
-%{?_licensedir:%license NTS/COPYING}
+%license NTS/COPYING
 %doc %{pecl_docdir}/%{pecl_name}
 %config(noreplace) %{php_inidir}/%{ini_name}
 %{php_extdir}/%{pecl_name}.so
-%{pecl_xmldir}/%{name}.xml
+%{pecl_xmldir}/%{pecl_name}.xml
 
 %if %{with_zts}
 %config(noreplace) %{php_ztsinidir}/%{ini_name}
@@ -191,6 +231,9 @@ REPORT_EXIT_STATUS=1 \
 
 
 %changelog
+* Thu Jan 25 2018 Ben Harper <ben.harper@rackspace.com> - 2.0.5-1.ius
+- port from Fedora
+
 * Mon Nov  6 2017 Remi Collet <remi@remirepo.net> - 2.0.5-1
 - update to 2.0.5 (stable)
 
