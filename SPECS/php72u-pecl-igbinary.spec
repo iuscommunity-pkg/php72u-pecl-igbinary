@@ -9,23 +9,23 @@
 # Please, preserve the changelog entries
 #
 %global pecl_name  igbinary
-%global with_zts   0%{?__ztsphp:1}
 %global ini_name   40-%{pecl_name}.ini
-%global php_base php72u
+%global php        php72u
+
+%bcond_without zts
 
 Summary:        Replacement for the standard PHP serializer
-Name:           %{php_base}-pecl-%{pecl_name}
+Name:           %{php}-pecl-%{pecl_name}
 Version:        2.0.5
 Release:        1.ius%{?dist}
-Source0:        http://pecl.php.net/get/%{pecl_name}-%{version}.tgz
+Source0:        https://pecl.php.net/get/%{pecl_name}-%{version}.tgz
 License:        BSD
 Group:          System Environment/Libraries
-
-URL:            http://pecl.php.net/package/%{pecl_name}
+URL:            https://pecl.php.net/package/%{pecl_name}
 
 BuildRequires:  pecl >= 1.10.0
-BuildRequires:  %{php_base}-devel
-BuildRequires:  %{php_base}-pecl-apcu-devel
+BuildRequires:  %{php}-devel
+BuildRequires:  %{php}-pecl-apcu-devel
 
 Requires:       php(zend-abi) = %{php_zend_api}
 Requires:       php(api) = %{php_core_api}
@@ -40,14 +40,14 @@ Provides:       php-pecl-%{pecl_name}%{?_isa} = %{version}
 # provide the stock and IUS names without pecl
 Provides:       php-%{pecl_name} = %{version}
 Provides:       php-%{pecl_name}%{?_isa} = %{version}
-Provides:       %{php_base}-%{pecl_name} = %{version}
-Provides:       %{php_base}-%{pecl_name}%{?_isa} = %{version}
+Provides:       %{php}-%{pecl_name} = %{version}
+Provides:       %{php}-%{pecl_name}%{?_isa} = %{version}
 
 # provide the stock and IUS names in pecl() format
 Provides:       php-pecl(%{pecl_name}) = %{version}
 Provides:       php-pecl(%{pecl_name})%{?_isa} = %{version}
-Provides:       %{php_base}-pecl(%{pecl_name}) = %{version}
-Provides:       %{php_base}-pecl(%{pecl_name})%{?_isa} = %{version}
+Provides:       %{php}-pecl(%{pecl_name}) = %{version}
+Provides:       %{php}-pecl(%{pecl_name})%{?_isa} = %{version}
 
 # conflict with the stock name
 Conflicts:      php-pecl-%{pecl_name} < %{version}
@@ -67,17 +67,18 @@ based storages for serialized data.
 
 
 %package devel
-Summary:       Igbinary developer files (header)
-Group:         Development/Libraries
+Summary:        Igbinary developer files (header)
+Group:          Development/Libraries
 Requires:       %{name}%{?_isa} = %{version}-%{release}
-Requires:       %{php_base}-devel%{?_isa}
+Requires:       %{php}-devel%{?_isa}
 
 Provides:       php-pecl-%{pecl_name}-devel = %{version}
 Provides:       php-pecl-%{pecl_name}-devel%{?_isa} = %{version}
 Conflicts:      php-pecl-%{pecl_name}-devel < %{version}
 
+
 %description devel
-These are the files needed to compile programs using Igbinary
+These are the files needed to compile programs using Igbinary.
 
 
 %prep
@@ -86,22 +87,18 @@ mv %{pecl_name}-%{version} NTS
 
 sed -e '/COPYING/s/role="doc"/role="src"/' -i package.xml
 
-pushd NTS
-
 # Check version
-subdir="php$(%{__php} -r 'echo PHP_MAJOR_VERSION;')"
-extver=$(sed -n '/#define PHP_IGBINARY_VERSION/{s/.* "//;s/".*$//;p}' src/$subdir/igbinary.h)
+extver=$(sed -n '/#define PHP_IGBINARY_VERSION/{s/.* "//;s/".*$//;p}' NTS/src/php7/igbinary.h)
 if test "x${extver}" != "x%{version}"; then
    : Error: Upstream version is ${extver}, expecting %{version}.
    exit 1
 fi
-popd
 
-%if %{with_zts}
+%if %{with zts}
 cp -r NTS ZTS
 %endif
 
-cat <<EOF | tee %{ini_name}
+cat > %{ini_name} << EOF
 ; Enable %{pecl_name} extension module
 extension=%{pecl_name}.so
 
@@ -121,14 +118,14 @@ EOF
 pushd NTS
 %{_bindir}/phpize
 %configure --with-php-config=%{_bindir}/php-config
-make %{?_smp_mflags}
+%make_build
 popd
 
-%if %{with_zts}
+%if %{with zts}
 pushd ZTS
 %{_bindir}/zts-phpize
 %configure --with-php-config=%{_bindir}/zts-php-config
-make %{?_smp_mflags}
+%make_build
 popd
 %endif
 
@@ -141,21 +138,18 @@ install -D -m 644 package.xml %{buildroot}%{pecl_xmldir}/%{pecl_name}.xml
 install -D -m 644 %{ini_name} %{buildroot}%{php_inidir}/%{ini_name}
 
 # Install the ZTS stuff
-%if %{with_zts}
+%if %{with zts}
 make install -C ZTS INSTALL_ROOT=%{buildroot}
 install -D -m 644 %{ini_name} %{buildroot}%{php_ztsinidir}/%{ini_name}
 %endif
 
 # Test & Documentation
-pushd NTS
-for i in $(grep 'role="test"' ../package.xml | sed -e 's/^.*name="//;s/".*$//')
-do [ -f $i       ] && install -Dpm 644 $i       %{buildroot}%{pecl_testdir}/%{pecl_name}/$i
-   [ -f tests/$i ] && install -Dpm 644 tests/$i %{buildroot}%{pecl_testdir}/%{pecl_name}/tests/$i
+for i in $(grep 'role="test"' package.xml | sed -e 's/^.*name="//;s/".*$//')
+do install -D -p -m 644 NTS/$i %{buildroot}%{pecl_testdir}/%{pecl_name}/$i
 done
-for i in $(grep 'role="doc"' ../package.xml | sed -e 's/^.*name="//;s/".*$//')
-do install -Dpm 644 $i %{buildroot}%{pecl_docdir}/%{pecl_name}/$i
+for i in $(grep 'role="doc"' package.xml | sed -e 's/^.*name="//;s/".*$//')
+do install -D -p -m 644 NTS/$i %{buildroot}%{pecl_docdir}/%{pecl_name}/$i
 done
-popd
 
 
 %check
@@ -168,20 +162,20 @@ if [ -f %{php_extdir}/apcu.so ]; then
 fi
 
 : simple NTS module load test, without APC, as optional
-%{_bindir}/php --no-php-ini \
+%{__php} --no-php-ini \
     --define extension=%{buildroot}%{php_extdir}/%{pecl_name}.so \
     --modules | grep %{pecl_name}
 
 : upstream test suite
 pushd NTS
-TEST_PHP_EXECUTABLE=%{_bindir}/php \
-TEST_PHP_ARGS="-n $MOD -d extension=$PWD/modules/%{pecl_name}.so" \
+TEST_PHP_EXECUTABLE=%{__php} \
+TEST_PHP_ARGS="-n $MOD -d extension=%{buildroot}%{php_extdir}/%{pecl_name}.so" \
 NO_INTERACTION=1 \
 REPORT_EXIT_STATUS=1 \
-%{_bindir}/php -n run-tests.php --show-diff
+%{__php} -n run-tests.php --show-diff
 popd
 
-%if %{with_zts}
+%if %{with zts}
 : simple ZTS module load test, without APC, as optional
 %{__ztsphp} --no-php-ini \
     --define extension=%{buildroot}%{php_ztsextdir}/%{pecl_name}.so \
@@ -190,7 +184,7 @@ popd
 : upstream test suite
 pushd ZTS
 TEST_PHP_EXECUTABLE=%{__ztsphp} \
-TEST_PHP_ARGS="-n $MOD -d extension=$PWD/modules/%{pecl_name}.so" \
+TEST_PHP_ARGS="-n $MOD -d extension=%{buildroot}%{php_ztsextdir}/%{pecl_name}.so" \
 NO_INTERACTION=1 \
 REPORT_EXIT_STATUS=1 \
 %{__ztsphp} -n run-tests.php --show-diff
@@ -215,7 +209,7 @@ fi
 %{php_extdir}/%{pecl_name}.so
 %{pecl_xmldir}/%{pecl_name}.xml
 
-%if %{with_zts}
+%if %{with zts}
 %config(noreplace) %{php_ztsinidir}/%{ini_name}
 %{php_ztsextdir}/%{pecl_name}.so
 %endif
@@ -225,7 +219,7 @@ fi
 %doc %{pecl_testdir}/%{pecl_name}
 %{php_incldir}/ext/%{pecl_name}
 
-%if %{with_zts}
+%if %{with zts}
 %{php_ztsincldir}/ext/%{pecl_name}
 %endif
 
