@@ -16,15 +16,16 @@
 
 Summary:        Replacement for the standard PHP serializer
 Name:           %{php}-pecl-%{pecl_name}
-Version:        2.0.5
-Release:        2.ius%{?dist}
+Version:        3.0.1
+Release:        1%{?dist}
 Source0:        https://pecl.php.net/get/%{pecl_name}-%{version}.tgz
 License:        BSD
-Group:          System Environment/Libraries
 URL:            https://pecl.php.net/package/%{pecl_name}
 
+BuildRequires:  gcc
 BuildRequires:  %{php}-devel
 BuildRequires:  %{php}-pecl-apcu-devel
+BuildRequires:  %{php}-json
 
 BuildRequires:  pear1u
 # explicitly require pear dependencies to avoid conflicts
@@ -35,10 +36,6 @@ BuildRequires:  %{php}-xml
 
 Requires:       php(zend-abi) = %{php_zend_api}
 Requires:       php(api) = %{php_core_api}
-
-# provide the stock name
-Provides:       php-pecl-%{pecl_name} = %{version}
-Provides:       php-pecl-%{pecl_name}%{?_isa} = %{version}
 
 # provide the stock and IUS names without pecl
 Provides:       php-%{pecl_name} = %{version}
@@ -52,8 +49,10 @@ Provides:       php-pecl(%{pecl_name})%{?_isa} = %{version}
 Provides:       %{php}-pecl(%{pecl_name}) = %{version}
 Provides:       %{php}-pecl(%{pecl_name})%{?_isa} = %{version}
 
-# conflict with the stock name
-Conflicts:      php-pecl-%{pecl_name} < %{version}
+# safe replacement
+Provides:       php-pecl-%{pecl_name} = %{version}-%{release}
+Provides:       php-pecl-%{pecl_name}%{?_isa} = %{version}-%{release}
+Conflicts:      php-pecl-%{pecl_name} < %{version}-%{release}
 
 %{?filter_provides_in: %filter_provides_in %{php_extdir}/.*\.so$}
 %{?filter_provides_in: %filter_provides_in %{php_ztsextdir}/.*\.so$}
@@ -71,13 +70,12 @@ based storages for serialized data.
 
 %package devel
 Summary:        Igbinary developer files (header)
-Group:          Development/Libraries
 Requires:       %{name}%{?_isa} = %{version}-%{release}
 Requires:       %{php}-devel%{?_isa}
-
-Provides:       php-pecl-%{pecl_name}-devel = %{version}
-Provides:       php-pecl-%{pecl_name}-devel%{?_isa} = %{version}
-Conflicts:      php-pecl-%{pecl_name}-devel < %{version}
+# safe replacement
+Provides:       php-pecl-%{pecl_name}-devel = %{version}-%{release}
+Provides:       php-pecl-%{pecl_name}-devel%{?_isa} = %{version}-%{release}
+Conflicts:      php-pecl-%{pecl_name}-devel < %{version}-%{release}
 
 
 %description devel
@@ -148,7 +146,8 @@ install -D -m 644 %{ini_name} %{buildroot}%{php_ztsinidir}/%{ini_name}
 
 # Test & Documentation
 for i in $(grep 'role="test"' package.xml | sed -e 's/^.*name="//;s/".*$//')
-do install -D -p -m 644 NTS/$i %{buildroot}%{pecl_testdir}/%{pecl_name}/$i
+do [ -f NTS/$i       ] && install -Dpm 644 NTS/$i       %{buildroot}%{pecl_testdir}/%{pecl_name}/$i
+   [ -f NTS/tests/$i ] && install -Dpm 644 NTS/tests/$i %{buildroot}%{pecl_testdir}/%{pecl_name}/tests/$i
 done
 for i in $(grep 'role="doc"' package.xml | sed -e 's/^.*name="//;s/".*$//')
 do install -D -p -m 644 NTS/$i %{buildroot}%{pecl_docdir}/%{pecl_name}/$i
@@ -159,15 +158,19 @@ done
 # drop extension load from phpt
 sed -e '/^extension=/d' -i ?TS/tests/*phpt
 
-# APC required for test 045
-if [ -f %{php_extdir}/apcu.so ]; then
-  MOD="-d extension=apcu.so"
-fi
-
 : simple NTS module load test, without APC, as optional
 %{__php} --no-php-ini \
     --define extension=%{buildroot}%{php_extdir}/%{pecl_name}.so \
     --modules | grep %{pecl_name}
+
+# APC required for test 045
+if [ -f %{php_extdir}/apcu.so ]; then
+  MOD="-d extension=apcu.so"
+fi
+# Json used in tests
+if [ -f %{php_extdir}/json.so ]; then
+  MOD="$MOD -d extension=json.so"
+fi
 
 : upstream test suite
 pushd NTS
@@ -236,6 +239,9 @@ fi
 
 
 %changelog
+* Tue Jul 02 2019 Carl George <carl@george.computer> - 3.0.1-1
+- Latest upstream
+
 * Thu Feb 01 2018 Carl George <carl@george.computer> - 2.0.5-2.ius
 - Remove pear requirement and update scriptlets (adapted from remirepo)
 
