@@ -23,16 +23,11 @@ License:        BSD
 URL:            https://pecl.php.net/package/%{pecl_name}
 
 BuildRequires:  gcc
+# build require pear1's dependencies to avoid mismatched php stacks
+BuildRequires:  pear1 %{php}-cli %{php}-common %{php}-xml
 BuildRequires:  %{php}-devel
 BuildRequires:  %{php}-pecl-apcu-devel
 BuildRequires:  %{php}-json
-
-BuildRequires:  pear1u
-# explicitly require pear dependencies to avoid conflicts
-BuildRequires:  %{php}-cli
-BuildRequires:  %{php}-common
-BuildRequires:  %{php}-process
-BuildRequires:  %{php}-xml
 
 Requires:       php(zend-abi) = %{php_zend_api}
 Requires:       php(api) = %{php_core_api}
@@ -198,7 +193,7 @@ popd
 %endif
 
 
-%triggerin -- pear1u
+%triggerin -- pear1
 if [ -x %{__pecl} ]; then
     %{pecl_install} %{pecl_xmldir}/%{pecl_name}.xml >/dev/null || :
 fi
@@ -241,6 +236,7 @@ fi
 %changelog
 * Tue Jul 02 2019 Carl George <carl@george.computer> - 3.0.1-1
 - Latest upstream
+- Switch from pear1u to pear1
 
 * Thu Feb 01 2018 Carl George <carl@george.computer> - 2.0.5-2.ius
 - Remove pear requirement and update scriptlets (adapted from remirepo)
